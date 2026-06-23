@@ -1,0 +1,4 @@
+# Keep shell + node scripts LF so they run on WSL/Linux/macOS after a Windows checkout
+scripts/usage-check    text eol=lf
+*.mjs                  text eol=lf
+*.sh                   text eol=lf
