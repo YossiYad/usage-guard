@@ -1,0 +1,11 @@
+# OS / editor cruft
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+*.swp
+*~
+
+# Never commit local runtime/usage state if anyone runs the scripts inside the repo
+usage-snapshot.json
+.credentials.json

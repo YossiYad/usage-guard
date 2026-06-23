@@ -1,0 +1,128 @@
+#!/usr/bin/env bash
+# usage-guard: cross-source usage reader for WSL / Linux / macOS.
+# Prints key=value lines (or --json) describing how much usage is left.
+# Sources, in priority order: local snapshot -> oauth usage endpoint -> unavailable.
+# Never invents numbers. Anything it cannot read from a real source is "unknown".
+#
+# Requires: jq, curl.
+
+set -u
+
+JSON_OUT=0
+MAX_SNAPSHOT_AGE_SECONDS=180
+for arg in "$@"; do
+  case "$arg" in
+    --json) JSON_OUT=1 ;;
+    --max-age=*) MAX_SNAPSHOT_AGE_SECONDS="${arg#*=}" ;;
+  esac
+done
+
+CLAUDE_DIR="${HOME}/.claude"
+SNAPSHOT_PATH="${CLAUDE_DIR}/usage-snapshot.json"
+CREDS_PATH="${CLAUDE_DIR}/.credentials.json"
+USAGE_URL="https://api.anthropic.com/api/oauth/usage"
+
+source_val="unavailable"
+five_hour_pct="unknown"
+seven_day_pct="unknown"
+context_pct="unknown"
+five_hour_resets_at="unknown"
+seven_day_resets_at="unknown"
+snapshot_age_seconds="unknown"
+note=""
+
+have() { command -v "$1" >/dev/null 2>&1; }
+
+if ! have jq; then
+  note="jq not installed; cannot read JSON sources"
+  source_val="unavailable"
+else
+  round_pct() {
+    # arg may be null/empty/float; echo rounded int or "unknown"
+    local v="$1"
+    if [ -z "$v" ] || [ "$v" = "null" ]; then echo "unknown"; return; fi
+    awk -v x="$v" 'BEGIN{ if (x ~ /^[0-9.]+$/) { if (x<=1) x=x*100; printf "%.0f", x } else { print "unknown" } }'
+  }
+
+  snapshot_used=0
+  # --- 1) Local snapshot ----------------------------------------------------
+  if [ -f "$SNAPSHOT_PATH" ]; then
+    ts=$(jq -r '.timestamp // empty' "$SNAPSHOT_PATH" 2>/dev/null || true)
+    if [ -n "$ts" ]; then
+      ts_epoch=$(date -d "$ts" +%s 2>/dev/null || true)
+      now_epoch=$(date -u +%s)
+      if [ -n "$ts_epoch" ]; then
+        snapshot_age_seconds=$(( now_epoch - ts_epoch ))
+        if [ "$snapshot_age_seconds" -le "$MAX_SNAPSHOT_AGE_SECONDS" ]; then
+          source_val="snapshot"
+          five_hour_pct=$(round_pct "$(jq -r '.five_hour_pct // empty' "$SNAPSHOT_PATH")")
+          seven_day_pct=$(round_pct "$(jq -r '.seven_day_pct // empty' "$SNAPSHOT_PATH")")
+          context_pct=$(round_pct "$(jq -r '.context_pct // empty' "$SNAPSHOT_PATH")")
+          fr=$(jq -r '.five_hour_resets_at // empty' "$SNAPSHOT_PATH"); [ -n "$fr" ] && five_hour_resets_at="$fr"
+          sr=$(jq -r '.seven_day_resets_at // empty' "$SNAPSHOT_PATH"); [ -n "$sr" ] && seven_day_resets_at="$sr"
+          note="fresh snapshot (${snapshot_age_seconds}s old)"
+          snapshot_used=1
+        fi
+      fi
+    fi
+  fi
+
+  # --- 2) Fallback: oauth usage endpoint ------------------------------------
+  if [ "$snapshot_used" -eq 0 ]; then
+    token=""
+    if [ -f "$CREDS_PATH" ]; then
+      token=$(jq -r '.claudeAiOauth.accessToken // empty' "$CREDS_PATH" 2>/dev/null || true)
+    else
+      note="credentials file not found"
+    fi
+
+    if [ -n "$token" ] && have curl; then
+      body=$(curl -s --max-time 15 -w $'\n%{http_code}' \
+        -H "Authorization: Bearer ${token}" \
+        -H "anthropic-beta: oauth-2025-04-20" \
+        "$USAGE_URL" 2>/dev/null || true)
+      http_code=$(printf '%s' "$body" | tail -n1)
+      json=$(printf '%s' "$body" | sed '$d')
+      if [ "$http_code" = "200" ] && [ -n "$json" ]; then
+        source_val="api"
+        five_hour_pct=$(round_pct "$(printf '%s' "$json" | jq -r '.five_hour.utilization // empty')")
+        seven_day_pct=$(round_pct "$(printf '%s' "$json" | jq -r '.seven_day.utilization // empty')")
+        fr=$(printf '%s' "$json" | jq -r '.five_hour.resets_at // empty'); [ -n "$fr" ] && five_hour_resets_at="$fr"
+        sr=$(printf '%s' "$json" | jq -r '.seven_day.resets_at // empty'); [ -n "$sr" ] && seven_day_resets_at="$sr"
+        note="live from unofficial oauth usage endpoint; context fill not available here - use /context"
+      else
+        source_val="unavailable"
+        note="endpoint failed: HTTP ${http_code:-none}"
+      fi
+    elif [ -z "$token" ] && [ -z "$note" ]; then
+      note="no access token in credentials"
+    elif ! have curl; then
+      note="curl not installed"
+    fi
+  fi
+fi
+
+if [ "$JSON_OUT" -eq 1 ]; then
+  jq -n \
+    --arg source "$source_val" \
+    --arg five_hour_pct "$five_hour_pct" \
+    --arg seven_day_pct "$seven_day_pct" \
+    --arg context_pct "$context_pct" \
+    --arg five_hour_resets_at "$five_hour_resets_at" \
+    --arg seven_day_resets_at "$seven_day_resets_at" \
+    --arg snapshot_age_seconds "$snapshot_age_seconds" \
+    --arg note "$note" \
+    '{source:$source,five_hour_pct:$five_hour_pct,seven_day_pct:$seven_day_pct,context_pct:$context_pct,five_hour_resets_at:$five_hour_resets_at,seven_day_resets_at:$seven_day_resets_at,snapshot_age_seconds:$snapshot_age_seconds,note:$note}' \
+    2>/dev/null || {
+      printf '{"source":"%s","note":"output-encode-failed"}\n' "$source_val"
+    }
+else
+  echo "source=${source_val}"
+  echo "five_hour_pct=${five_hour_pct}"
+  echo "seven_day_pct=${seven_day_pct}"
+  echo "context_pct=${context_pct}"
+  echo "five_hour_resets_at=${five_hour_resets_at}"
+  echo "seven_day_resets_at=${seven_day_resets_at}"
+  echo "snapshot_age_seconds=${snapshot_age_seconds}"
+  echo "note=${note}"
+fi
