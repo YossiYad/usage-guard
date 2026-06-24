@@ -128,6 +128,23 @@ You can let Claude Code do all of the above for you. Paste this into Claude Code
 Clone https://github.com/YossiYad/usage-guard and install the skill into my Claude skills directory at ~/.claude/skills/usage-guard. Merge the status line into settings.json without overwriting anything that already exists, and verify that the usage-check script runs and returns real numbers.
 ```
 
+## Install as a Cowork plugin
+
+Prefer Claude Cowork? You can install the packaged plugin instead of cloning
+and copying files by hand:
+
+1. Download [`usage-guard.plugin`](usage-guard.plugin) from this repository. On
+   GitHub, open the file at the repo root and click **Download raw file** (the
+   download icon).
+2. Open Claude Cowork and drag the `usage-guard.plugin` file into a chat.
+3. A plugin preview card appears - press **Install** to add it.
+
+> **Note:** usage-guard was built for Claude **Code**, where the status line
+> streams `rate_limits` and `context_window` into the local snapshot. Claude
+> Cowork does not expose that status-line feed, so inside Cowork the snapshot
+> source will usually be empty and the skill falls back to the unofficial usage
+> endpoint (or reports `unavailable`). It is most useful in Claude Code.
+
 ## Verifying it works
 
 Run the helper directly:

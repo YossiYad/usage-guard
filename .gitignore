@@ -9,3 +9,6 @@ Desktop.ini
 # Never commit local runtime/usage state if anyone runs the scripts inside the repo
 usage-snapshot.json
 .credentials.json
+
+# Local plugin build directory (the published artifact lives at the repo root)
+dist/
