@@ -1,5 +1,9 @@
 # usage-guard
 
+<p align="center">
+  <img src="assets/banner.jpg" alt="Running on empty at the usage pump" width="480">
+</p>
+
 A Claude Code skill that keeps track of how much usage you have left in a
 session and manages the work so it never gets cut off in the middle of an
 incomplete change.
@@ -53,7 +57,7 @@ from a real source.
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/<USERNAME>/usage-guard
+   git clone https://github.com/YossiYad/usage-guard
    ```
 
 2. Copy the whole folder into your Claude skills directory as `usage-guard`:
@@ -121,7 +125,7 @@ from a real source.
 You can let Claude Code do all of the above for you. Paste this into Claude Code:
 
 ```text
-Clone https://github.com/<USERNAME>/usage-guard and install the skill into my Claude skills directory at ~/.claude/skills/usage-guard. Merge the status line into settings.json without overwriting anything that already exists, and verify that the usage-check script runs and returns real numbers.
+Clone https://github.com/YossiYad/usage-guard and install the skill into my Claude skills directory at ~/.claude/skills/usage-guard. Merge the status line into settings.json without overwriting anything that already exists, and verify that the usage-check script runs and returns real numbers.
 ```
 
 ## Verifying it works
@@ -171,6 +175,8 @@ percentages means it is working.
 usage-guard/
 ├── SKILL.md                       # skill instructions + thresholds
 ├── README.md
+├── assets/
+│   └── banner.jpg
 └── scripts/
     ├── usage-check.ps1            # main helper (Windows / PowerShell)
     ├── usage-check                # main helper (WSL / Linux / macOS, needs jq)

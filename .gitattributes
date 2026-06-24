@@ -2,3 +2,8 @@
 scripts/usage-check    text eol=lf
 *.mjs                  text eol=lf
 *.sh                   text eol=lf
+
+# Binary assets must never be line-ending converted
+*.jpg                  binary
+*.jpeg                 binary
+*.png                  binary
