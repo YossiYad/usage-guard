@@ -7,3 +7,6 @@ scripts/usage-check    text eol=lf
 *.jpg                  binary
 *.jpeg                 binary
 *.png                  binary
+
+# Packaged Cowork plugin is a zip - never line-ending convert it
+*.plugin               binary
